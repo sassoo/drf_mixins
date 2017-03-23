@@ -1,4 +1,4 @@
-drf-mixins
+drf_mixins
 ======================================
 
 Overview

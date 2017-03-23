@@ -4,8 +4,8 @@ from setuptools import setup
 
 
 setup(
-    name='drf-mixins',
-    url='https://github.com/sassoo/drf-mixins',
+    name='drf_mixins',
+    url='https://github.com/sassoo/drf_mixins',
     license='BSD',
     description='Common DRF mixins',
     author='Sassoo',
