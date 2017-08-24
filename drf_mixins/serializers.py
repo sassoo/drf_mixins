@@ -32,12 +32,12 @@ class EagerInstanceMixin:
         against the object since it should be consistent.
         """
 
-        if self.instance is None:
-            self.instance = self.Meta.model()
+        data = super().validate(data)
+        instance = self.instance or self.Meta.model()
         for field, value in data.items():
-            setattr(self.instance, field, value)
-        self.validate_instance(self.instance)
-        return super().validate(data)
+            setattr(instance, field, value)
+        self.instance = self.validate_instance(instance)
+        return data
 
     def validate_instance(self, instance):
         """ Instance validation checks """
