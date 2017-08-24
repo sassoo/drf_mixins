@@ -6,33 +6,17 @@
 """
 
 
-class CavsMixin:
+class EagerInstanceMixin:
     """ DRF model serializer mixin
 
     This introduces a pattern that is much needed IMO
     where incoming data is validated & coerced on a field
     level & then immediately applied to the instance.
 
-    For short, coerce, apply, validate, save (CAVS) is
-    the proper flow.
-
     NOTE: with this mixin the native `create()` method
           is never called because an instance is always
           available so `save()` calls `update()`.
     """
-
-    def apply_to_instance(self, instance, data):
-        """ Apply the attrs to the instance
-
-        Override if additional cleaning or sanitizing
-        of the provided data on the instance is needed.
-
-        Most common when the object needs to be consistent
-        before object-level validation can safely occur.
-        """
-
-        for field, value in data.items():
-            setattr(instance, field, value)
 
     # pylint: disable=unused-argument
     def update(self, instance, validated_data):
@@ -50,14 +34,15 @@ class CavsMixin:
 
         if self.instance is None:
             self.instance = self.Meta.model()
-        self.apply_to_instance(self.instance, data)
+        for field, value in data.items():
+            setattr(self.instance, field, value)
         self.validate_instance(self.instance)
         return super().validate(data)
 
     def validate_instance(self, instance):
         """ Instance validation checks """
 
-        pass
+        raise NotImplementedError('`validate_instance()` must be implemented.')
 
 
 class WriteOnceMixin:
