@@ -61,28 +61,20 @@ class WriteOnceMixin:
     Now the fields in `write_once_fields` can be set during
     POST (create), but cannot be changed afterwards via PUT
     or PATCH (update).
-
-    Inspired by http://stackoverflow.com/a/37487134/627411.
     """
 
-    def get_extra_kwargs(self):
-        """ DRF serializer override """
+    def __init__(self, *args, **kwargs):
+        """ Override the DRF constructor """
 
-        extra_kwargs = super().get_extra_kwargs()
+        super().__init__(*args, **kwargs)
 
-        write_once_fields = getattr(self.Meta, 'write_once_fields', None)
-        if any((not write_once_fields, self.instance is None)):
-            return extra_kwargs
-
+        write_once_fields = getattr(self.Meta, 'write_once_fields', [])
         if not isinstance(write_once_fields, (list, tuple)):
             raise TypeError(
                 'The `write_once_fields` option must be a list or tuple. '
                 'Got {}.'.format(type(write_once_fields).__name__)
             )
 
-        for field in write_once_fields:
-            kwargs = extra_kwargs.get(field, {})
-            kwargs['read_only'] = True
-            extra_kwargs[field] = kwargs
-
-        return extra_kwargs
+        if write_once_fields and self.instance:
+            for field in write_once_fields:
+                self.fields[field].read_only = True
