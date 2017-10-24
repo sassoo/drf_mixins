@@ -48,27 +48,33 @@ class EagerInstanceMixin:
 class WriteOnceMixin:
     """ Adds support for write once fields to serializers.
 
-    To use it, specify a write_once key in the `extra_kwargs`
-    DRF ModelSerializer.Meta class parameter.
+    To use it, specify a list of fields as `write_once_fields`
+    on the serializer's Meta:
 
     ```
     class Meta:
         model = SomeModel
         fields = '__all__'
-        extra_kwargs = {
-            'name': {'write_once': True},
-        }
+        write_once_fields = ('collection', )
     ```
 
-    Now these fields in can be set during POST (create), but
-    cannot be changed afterwards via PUT or PATCH (update).
+    Now the fields in `write_once_fields` can be set during
+    POST (create), but cannot be changed afterwards via PUT
+    or PATCH (update).
     """
 
-    def get_extra_kwargs(self):
-        """ Override the DRF ModelSerializer method """
+    def __init__(self, *args, **kwargs):
+        """ Override the DRF constructor """
 
-        extra_kwargs = super().get_extra_kwargs()
+        super().__init__(*args, **kwargs)
 
-        for kwargs in extra_kwargs.values():
-            if self.instance and kwargs.get('write_once'):
-                kwargs['read_only'] = kwargs.pop('write_once')
+        write_once_fields = getattr(self.Meta, 'write_once_fields', [])
+        if not isinstance(write_once_fields, (list, tuple)):
+            raise TypeError(
+                'The `write_once_fields` option must be a list or tuple. '
+                'Got {}.'.format(type(write_once_fields).__name__)
+            )
+
+        if write_once_fields and self.instance:
+            for field in write_once_fields:
+                self.fields[field].read_only = True
