@@ -175,11 +175,50 @@ class PolymorphicMixin:
             return super().to_representation(instance)
 
 
+class WriteAdminMixin:
+    """ Adds support for writable fields for only admins to serializers.
+
+    To use it, specify a list of fields as `admin_writable_fields`
+    on the serializers Meta:
+
+    ```
+    class Meta:
+        model = SomeModel
+        fields = '__all__'
+        admin_writable_fields = ('is_admin', 'can_be_god')
+    ```
+
+    Now the fields in `admin_writable_fields` can be written only
+    by users with the `is_admin` field equal to True.
+    """
+
+    def get_fields(self):
+        """ DRF override """
+
+        fields = super().get_fields()
+
+        try:
+            is_admin = self.context['request'].user.is_admin
+        except (AttributeError, KeyError):
+            is_admin = True
+
+        admin_writable_fields = getattr(self.Meta, 'admin_writable_fields', ())
+        if not isinstance(admin_writable_fields, (list, tuple)):
+            raise TypeError(
+                'The `admin_writable_fields` option must be a list or tuple. '
+                'Got {}.'.format(type(admin_writable_fields).__name__)
+            )
+
+        for field in admin_writable_fields:
+            fields[field].read_only = not is_admin
+        return fields
+
+
 class WriteOnceMixin:
     """ Adds support for write once fields to serializers.
 
     To use it, specify a list of fields as `write_once_fields`
-    on the serializer's Meta:
+    on the serializers Meta:
 
     ```
     class Meta:
@@ -193,12 +232,12 @@ class WriteOnceMixin:
     or PATCH (update).
     """
 
-    def __init__(self, *args, **kwargs):
-        """ Override the DRF constructor """
+    def get_fields(self):
+        """ DRF override """
 
-        super().__init__(*args, **kwargs)
+        fields = super().get_fields()
 
-        write_once_fields = getattr(self.Meta, 'write_once_fields', [])
+        write_once_fields = getattr(self.Meta, 'write_once_fields', ())
         if not isinstance(write_once_fields, (list, tuple)):
             raise TypeError(
                 'The `write_once_fields` option must be a list or tuple. '
@@ -207,4 +246,5 @@ class WriteOnceMixin:
 
         if write_once_fields and self.instance:
             for field in write_once_fields:
-                self.fields[field].read_only = True
+                fields[field].read_only = True
+        return fields
