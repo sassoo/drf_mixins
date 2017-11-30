@@ -28,4 +28,6 @@ class AtomicUpdateMixin:
         """ DRF override to enforce `select_for_update` """
 
         queryset = super().get_queryset()
-        return queryset.select_for_update()
+        if self.request.method in ('PATCH', 'PUT'):
+            queryset = queryset.select_for_update()
+        return queryset
