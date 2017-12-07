@@ -152,3 +152,9 @@ class WriteUpdateOnlyMixin:
             for field in write_update_only_fields:
                 fields[field].read_only = True
         return fields
+
+
+class WriteHelpers(WriteAdminOnlyMixin, WriteCreateOnlyMixin, WriteUpdateOnlyMixin):
+    """ All of our write related helpers """
+
+    pass
