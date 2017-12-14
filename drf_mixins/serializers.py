@@ -27,9 +27,8 @@ class PolymorphicMixin:
     def to_representation(self, instance):
         """ DRF override, use the real serializer on the instance
 
-        WARN: this will create a new serializer instance on
-              every object when dealing with many's. This
-              could be super wasteful.
+        WARN: this will create a new serializer instance on every
+              object when dealing with many's. This could be super wasteful.
         """
 
         field = self.Meta.polymorphic_field
@@ -43,118 +42,58 @@ class PolymorphicMixin:
             return super().to_representation(instance)
 
 
-class WriteAdminOnlyMixin:
-    """ Adds support for writable fields for only admins to serializers.
+class ReadOnlyHelpersMixin:
+    """ Common read-only shortcuts
 
-    To use it, specify a list of fields as `write_admin_only_fields`
-    on the serializers Meta:
+    The source is super simple & readable but a basic example of forcing
+    the `foo` field to read-only during "create", `bar` field to read-only
+    during "update", & `is_god` field to read-only if not an admin is:
 
-    ```
-    class Meta:
-        model = SomeModel
-        fields = '__all__'
-        write_admin_only_fields = ('is_admin', 'can_be_god')
-    ```
+        ```
+        class BigSerializer(serializers.Serializer):
 
-    Now the fields in `write_admin_only_fields` can be written only
-    by users with the `is_admin` field equal to True.
+            <fields names> = <field types>
+
+            class Meta:
+                read_only_not_admin_fields = ('is_admin',)
+                read_only_on_create_fields = ('foo',)
+                read_only_on_update_fields = ('bar',)
+        ```
     """
 
     def get_fields(self):
         """ DRF override """
 
-        fields = super().get_fields()
+        def _set_read_only(helper):
+            try:
+                names = getattr(meta, helper, ())
+                for name in names:
+                    fields[name].read_only = True
+            except KeyError as exc:
+                msg = '{}.Meta.{} attribute contains invalid field names'.format(
+                    self.__class__.__name__, helper)
+                raise Exception(msg) from exc
+            except TypeError as exc:
+                msg = '{}.Meta.{} attribute must be iterable. Got {}.'.format(
+                    self.__class__.__name__, helper, type(names).__name__)
+                raise Exception(msg) from exc
+
+        try:
+            fields = super().get_fields()
+            meta = self.Meta
+        except AttributeError:
+            return fields
 
         try:
             is_admin = self.context['request'].user.is_admin
         except (AttributeError, KeyError):
             is_admin = True
 
-        write_admin_only_fields = getattr(self.Meta, 'write_admin_only_fields', ())
-        if not isinstance(write_admin_only_fields, (list, tuple)):
-            raise TypeError(
-                'The `write_admin_only_fields` option must be a list or tuple. '
-                'Got {}.'.format(type(write_admin_only_fields).__name__)
-            )
+        if not is_admin:
+            _set_read_only('read_only_not_admin_fields')
+        if not self.instance:
+            _set_read_only('read_only_on_create_fields')
+        if self.instance:
+            _set_read_only('read_only_on_update_fields')
 
-        for field in write_admin_only_fields:
-            fields[field].read_only = not is_admin
         return fields
-
-
-class WriteCreateOnlyMixin:
-    """ Adds support for write protected fields on update to serializers.
-
-    To use it, specify a list of fields as `write_create_only_fields`
-    on the serializers Meta:
-
-    ```
-    class Meta:
-        model = SomeModel
-        fields = '__all__'
-        write_create_only_fields = ('foo', 'bar')
-    ```
-
-    Now the fields in `write_create_only_fields` can be written only if
-    the serializer is creating a new instance.
-    """
-
-    def get_fields(self):
-        """ DRF override """
-
-        fields = super().get_fields()
-        creating = not bool(self.instance)
-
-        write_create_only_fields = getattr(self.Meta, 'write_create_only_fields', ())
-        if not isinstance(write_create_only_fields, (list, tuple)):
-            raise TypeError(
-                'The `write_create_only_fields` option must be a list or tuple. '
-                'Got {}.'.format(type(write_create_only_fields).__name__)
-            )
-
-        if not creating:
-            for field in write_create_only_fields:
-                fields[field].read_only = True
-        return fields
-
-
-class WriteUpdateOnlyMixin:
-    """ Adds support for write protected fields on create to serializers.
-
-    To use it, specify a list of fields as `write_update_only_fields`
-    on the serializers Meta:
-
-    ```
-    class Meta:
-        model = SomeModel
-        fields = '__all__'
-        write_update_only_fields = ('foo', 'bar')
-    ```
-
-    Now the fields in `write_update_only_fields` can be written only if
-    the serializer is updating an existing instance.
-    """
-
-    def get_fields(self):
-        """ DRF override """
-
-        fields = super().get_fields()
-        updating = bool(self.instance)
-
-        write_update_only_fields = getattr(self.Meta, 'write_update_only_fields', ())
-        if not isinstance(write_update_only_fields, (list, tuple)):
-            raise TypeError(
-                'The `write_update_only_fields` option must be a list or tuple. '
-                'Got {}.'.format(type(write_update_only_fields).__name__)
-            )
-
-        if not updating:
-            for field in write_update_only_fields:
-                fields[field].read_only = True
-        return fields
-
-
-class WriteHelpers(WriteAdminOnlyMixin, WriteCreateOnlyMixin, WriteUpdateOnlyMixin):
-    """ All of our write related helpers """
-
-    pass
