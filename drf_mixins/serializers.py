@@ -5,6 +5,8 @@
     All our DRF serializer mixins used across apps
 """
 
+import fnmatch
+
 
 class PolymorphicMixin:
     """ A READ-ONLY polymorphic serializer
@@ -95,5 +97,49 @@ class ReadOnlyHelpersMixin:
             _set_read_only('read_only_on_create_fields')
         if self.instance:
             _set_read_only('read_only_on_update_fields')
+
+        return fields
+
+
+class ReadOnlyUnlessMixin:
+    """ Mixin to support a common pattern of conditionally needing fields
+
+    The example below would set the `paid_amount` field to read-only
+    if the `has_balance` field is False, thereby skipping validation
+    logic of that field since it's unwanted:
+
+        ```
+        class BigSerializer(serializers.Serializer):
+
+            has_balance = BooleanField()
+            paid_amount = DecimalField()
+
+            class Meta:
+                read_only_unless = {'has_balance': ('paid_amount',)}
+        ```
+    """
+
+    def get_fields(self):
+        """ DRF override """
+
+        try:
+            fields = super().get_fields()
+            data = self.initial_data
+            names = fields.keys()
+            meta = self.Meta
+        except AttributeError:
+            return fields
+
+        try:
+            params = getattr(meta, 'read_only_unless', {})
+            for check, exprs in params.items():
+                if data.get(check) is not True:
+                    for expr in exprs:
+                        for field in fnmatch.filter(names, expr):
+                            fields[field].read_only = True
+        except AttributeError as exc:
+            msg = '{}.Meta.{} attribute must be a dict. Got {}.'.format(
+                self.__class__.__name__, 'read_only_unless', type(params).__name__)
+            raise Exception(msg) from exc
 
         return fields
